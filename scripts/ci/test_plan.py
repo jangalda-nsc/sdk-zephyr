@@ -18,10 +18,10 @@ from git import Repo
 if "ZEPHYR_BASE" not in os.environ:
     exit("$ZEPHYR_BASE environment variable undefined.")
 
-repository_path = Path(os.environ['ZEPHYR_BASE'])
+zephyr_base = Path(os.environ['ZEPHYR_BASE'])
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 
-sys.path.append(os.path.join(repository_path, 'scripts'))
+sys.path.append(os.path.join(zephyr_base, 'scripts'))
 import list_boards
 
 def _get_match_fn(globs, regexes):
@@ -110,7 +110,7 @@ class Filters:
 
     def get_plan(self, options, integration=False):
         fname = "_test_plan_partial.json"
-        cmd = ["scripts/twister", "-c"] + options + ["--save-tests", fname ]
+        cmd = [f"{zephyr_base}/scripts/twister", "-c"] + options + ["--save-tests", fname ]
         if self.no_path_name:
             cmd += ["--no-path-name"]
         if integration:
@@ -168,8 +168,12 @@ class Filters:
             if p and p.groups():
                 boards.add(p.group(1))
 
-        # Limit search to $ZEPHYR_BASE since this is where the changed files are
-        lb_args = argparse.Namespace(**{ 'arch_roots': [repository_path], 'board_roots': [repository_path] })
+        roots = [zephyr_base]
+        if repository_path != zephyr_base:
+            roots.append(repository_path)
+
+        # Look for boards in monitored repositories
+        lb_args = argparse.Namespace(**{ 'arch_roots': roots, 'board_roots': roots})
         known_boards = list_boards.find_boards(lb_args)
         for b in boards:
             name_re = re.compile(b)
@@ -224,7 +228,7 @@ class Filters:
 
     def find_tags(self):
 
-        tag_cfg_file = os.path.join(repository_path, 'scripts', 'ci', 'tags.yaml')
+        tag_cfg_file = os.path.join(zephyr_base, 'scripts', 'ci', 'tags.yaml')
         with open(tag_cfg_file, 'r') as ymlfile:
             tags_config = yaml.safe_load(ymlfile)
 
@@ -312,6 +316,8 @@ def parse_args():
             help="Number of tests per builder")
     parser.add_argument('-n', '--default-matrix', default=10, type=int,
             help="Number of tests per builder")
+    parser.add_argument('-r', '--repo-to-scan', default=None,
+                        help="Repo to scan")
     parser.add_argument('--no-path-name', action="store_true",
             help="Don't put paths into test suites' names ")
 
@@ -323,9 +329,12 @@ if __name__ == "__main__":
     args = parse_args()
     files = []
     errors = 0
+    repository_path = zephyr_base
+    if args.repo_to_scan:
+        repository_path = Path(args.repo_to_scan)
     if args.commits:
-        repo = Repo(repository_path)
-        commit = repo.git.diff("--name-only", args.commits)
+        repo_to_scan = Repo(repository_path)
+        commit = repo_to_scan.git.diff("--name-only", args.commits)
         files = commit.split("\n")
     elif args.modified_files:
         with open(args.modified_files, "r") as fp:
