@@ -450,7 +450,7 @@ TESTDATA_4 = [
     (False, True, False, False, 123, None, ['generator', 'run', '--seed=123']),
     (False, False, True, False, None, None,
      ['west', 'flash', '--skip-rebuild', '-d', 'build_dir']),
-    (False, False, False, False, None, ['ex1', 'ex2'], ['bin', 'ex1', 'ex2']),
+    (False, False, False, False, None, ['ex1', 'ex2'], ['build_dir/zephyr/zephyr.exe', 'ex1', 'ex2']),
 ]
 
 @pytest.mark.parametrize(
@@ -478,6 +478,7 @@ def test_binaryhandler_create_command(
     handler.seed = seed
     handler.extra_test_args = extra_args
     handler.build_dir = 'build_dir'
+    handler.instance.testsuite.sysbuild = False
 
     command = handler._create_command(robot_test)
 
@@ -1482,7 +1483,7 @@ TESTDATA_19 = [
     TESTDATA_19,
     ids=['domains build dir', 'self build dir']
 )
-def test_qemuhandler_get_sysbuild_build_dir(
+def test_qemuhandler_get_default_domain_build_dir(
     mocked_instance,
     self_sysbuild,
     self_build_dir,
@@ -1499,7 +1500,7 @@ def test_qemuhandler_get_sysbuild_build_dir(
     handler.build_dir = self_build_dir
 
     with mock.patch('domains.Domains.from_file', from_file_mock):
-        result = handler._get_sysbuild_build_dir()
+        result = handler.get_default_domain_build_dir()
 
     assert result == expected
 
@@ -2023,7 +2024,7 @@ def test_qemuhandler_handle(
     harness = mock.Mock(state=harness_state)
     handler_options_west_flash = []
 
-    sysbuild_build_dir = os.path.join('sysbuild', 'dummydir')
+    domain_build_dir = os.path.join('sysbuild', 'dummydir')
     command = ['generator_cmd', '-C', os.path.join('cmd', 'path'), 'run']
 
     handler.options = mock.Mock(
@@ -2036,7 +2037,7 @@ def test_qemuhandler_handle(
     handler._final_handle_actions = mock.Mock(return_value=None)
     handler._create_command = mock.Mock(return_value=command)
     handler._set_qemu_filenames = mock.Mock(side_effect=mock_filenames)
-    handler._get_sysbuild_build_dir = mock.Mock(return_value=sysbuild_build_dir)
+    handler.get_default_domain_build_dir = mock.Mock(return_value=domain_build_dir)
     handler.terminate = mock.Mock()
 
     unlink_mock = mock.Mock()
